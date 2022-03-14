@@ -15,7 +15,7 @@ all=0
 
 while getopts :ast:h asth 
 do
-case ${asth} in
+case "${asth}" in
 a)  all=1;;
 s)  sum=1;;
 t)  fetch_interval=$((OPTARG*60*1000));;
@@ -50,7 +50,7 @@ Example: $0 -t 60 -a \n"
     exit 0
 }
 
-[[ ${HELP} == 1 ]] && help
+[[ "${HELP}" == 1 ]] && help
 
 today=$(date +"%U_%d-%m-%y")
 week=$(date +"%U")
@@ -112,7 +112,7 @@ then
 else
     last_fetched=(tail -1 "${tmp_dir}/last_fetched")
     t_minus_fetch=$((timestamp-last_fetched))
-    if [[ ${t_minus_fetch} -gt "${fetch_interval}" ]]
+    if [[ "${t_minus_fetch}" -gt "${fetch_interval}" ]]
     then
         fetch=1
     else
@@ -124,16 +124,16 @@ case ${fetch} in
     10)
         xo-cli backupNg.getAllLogs \
             > "${tmp_dir}"/"${week}"_00.log
-        echo $timestamp >> "$tmp_dir"/last_fetched
+        echo "${timestamp}" >> "${tmp_dir}/last_fetched"
         ;;
     1)
         xo-cli backupNg.getLogs after="$((timestamp-last_fetched))" \
             >> "${tmp_dir}"/"${today}".log 
-        echo ${timestamp} >> "$tmp_dir"/last_fetched
+        echo "${timestamp}" >> "${tmp_dir}/last_fetched"
         ;;
 esac
 
-if [[ ${all} -eq 1 ]]
+if [[ "${all}" -eq 1 ]]
 then
     for line in $(jq -j '.[] | .id,",",.status,",",.jobName,"\n" ' "${tmp_dir}"/"${week}"_*.log \
         | sort | uniq )
@@ -157,7 +157,7 @@ if [[ "${all}" -eq 1 ]]
 then
 for status in "su" "pe" "in" "sk" "fa"; do
     for time in "week" "day"; do
-        for job in $(eval echo '${'${status}'_'${time}'[@]}')
+        for job in $(eval echo '${'"${status}"'_'"${time}"'[@]}')
             do
                 print_jobs
                 echo
@@ -167,13 +167,13 @@ done
 fi
 
 print_stats () {
-    for job in $(eval echo '${'${1}'_'${2}'[@]}')
+    for job in $(eval echo '${'"${1}"'_'"${2}"'[@]}')
     do
         print_jobs
     done
 }
 
-case ${backup_report} in
+case "${backup_report}" in
     256)
         echo -n "check backup"
         echo -n "today: "
