@@ -1,6 +1,5 @@
 #!/usr/bin/env bash
 
-set -x
 export PATH="$PATH:/usr/local/bin"
 
 xo-cli --list-commands >/dev/null 2>&1 || { 
@@ -107,31 +106,19 @@ sort_logs () {
 if [[ -f "$tmp_dir/$((week-1))_*.log" ]] 
 then
     rm -f "${tmp_dir}/$((week-1))_*.log"
-    last_fetched=0
-    fetch=10
+    xo-cli backupNg.getAllLogs \
+        > "${tmp_dir}"/"${week}"_00.log
+    echo "${timestamp}" >> "${tmp_dir}/last_fetched"
 else
-    last_fetched=(tail -1 "${tmp_dir}/last_fetched")
+    last_fetched=$(tail -1 "${tmp_dir}/last_fetched")
     t_minus_fetch=$((timestamp-last_fetched))
     if [[ "${t_minus_fetch}" -gt "${fetch_interval}" ]]
     then
-        fetch=1
-    else
-        fetch=0
-    fi
-fi
-
-case ${fetch} in
-    10)
-        xo-cli backupNg.getAllLogs \
-            > "${tmp_dir}"/"${week}"_00.log
-        echo "${timestamp}" >> "${tmp_dir}/last_fetched"
-        ;;
-    1)
         xo-cli backupNg.getLogs after="$((timestamp-last_fetched))" \
             >> "${tmp_dir}"/"${today}".log 
         echo "${timestamp}" >> "${tmp_dir}/last_fetched"
-        ;;
-esac
+    fi
+fi
 
 if [[ "${all}" -eq 1 ]]
 then
@@ -155,15 +142,17 @@ backup_report=$((_fa_day+_fa_week))
 
 if [[ "${all}" -eq 1 ]]
 then
-for status in "su" "pe" "in" "sk" "fa"; do
-    for time in "week" "day"; do
-        for job in $(eval echo '${'"${status}"'_'"${time}"'[@]}')
+    for status in "su" "pe" "in" "sk" "fa"
+    do
+        for time in "week" "day"
+        do
+            for job in $(eval echo '${'"${status}"'_'"${time}"'[@]}')
             do
                 print_jobs
                 echo
-done
     done
         done
+            done
 fi
 
 print_stats () {
