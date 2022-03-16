@@ -54,7 +54,7 @@ Example: $0 -t 60 -a \n"
 today=$(date +"%U_%d-%m-%y")
 week=$(date +"%U")
 timestamp=$(($(date +%s)*1000))
-weeko=$((timestamp-$((60*60*24*1000))))
+weeko=$((timestamp-$((60*60*24*1000)))) # bro i dont know why its called weeko. perhaps because i use it to determine if backups this WEEK Or this day. fuck me
 tmp_dir="/tmp/check_xoa_backup"
 backup_report=0 
 _su_day=0
