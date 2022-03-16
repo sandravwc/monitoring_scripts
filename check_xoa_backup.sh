@@ -14,15 +14,15 @@ all=0
 
 while getopts :ast:h asth 
 do
-case "${asth}" in
-a)  all=1;;
-s)  sum=1;;
-t)  fetch_interval=$((OPTARG*60*1000));;
-h)  HELP=1;;
-?)  echo "stop using invalid options, man."
-    exit 2
-    ;;
-esac
+    case "${asth}" in
+        a)  all=1;;
+        s)  sum=1;;
+        t)  fetch_interval=$((OPTARG*60*1000));;
+        h)  HELP=1;;
+        ?)  echo "stop using invalid options, man."
+            exit 2
+            ;;
+    esac
 done
 
 help () {
@@ -100,9 +100,17 @@ sort_logs () {
     fi
 }
 
+print_stats () {
+    for job in $(eval echo '${'"${1}"'_'"${2}"'[@]}')
+    do
+        print_jobs
+    done
+}
+
 #################
 ### action!!! ###
 
+# check if data needs to be fetched
 if [[ -f "$tmp_dir/$((week-1))_*.log" ]] 
 then
     rm -f "${tmp_dir}/$((week-1))_*.log"
@@ -140,6 +148,7 @@ backup_report=$((_fa_day+_fa_week))
 
 [[ "${sum}" -eq 1 ]] && echo "${backup_sum}"
 
+# do evals so i dont need to write that much
 if [[ "${all}" -eq 1 ]]
 then
     for status in "su" "pe" "in" "sk" "fa"
@@ -155,13 +164,7 @@ then
             done
 fi
 
-print_stats () {
-    for job in $(eval echo '${'"${1}"'_'"${2}"'[@]}')
-    do
-        print_jobs
-    done
-}
-
+# switch is more readable...
 case "${backup_report}" in
     256)
         echo -n "check backup"
