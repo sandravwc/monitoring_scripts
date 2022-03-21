@@ -35,110 +35,110 @@ IFS=$'\n'
 STATE=0
 _CRIT=0
 _WARN=0
-
-[[ $HELP -eq 1 ]] && help
-
+is_shared=$(xe sr-list shared=true type="${TYPE}")
+# shellcheck disable=SC2207
+hosts+=($(xe host-list params=name-label | awk '!/^\s*$/ {print $NF}'))
 # shellcheck disable=SC2207
 types+=($(xe sr-list params=type | awk '{print $NF}' | sort | uniq))
+sr_params='uuid,host,physical-size,physical-utilisation,name-label'
 
-if [[ ${LIST} -eq 1 ]] 
+round () {
+    awk '{print ($0-int($0)<0.499)?int($0):int($0)+1}'
+}
+
+[[ "${HELP}" -eq 1 ]] && help
+
+if [[ "${LIST}" -eq 1 ]] 
 then
     for ((i=0;i<${#types[@]};i++))
     do
         echo "${types[i]}"
     done
+    exit 0
 fi   
 
 # shellcheck disable=SC2207
-hosts+=($(xe host-list params=name-label | awk '{print $NF}'))
-
-shared () {
-for sr in `xe sr-list params=uuid,host,physical-size,physical-utilisation,name-label shared=true type=$TYPE | paste -s -d " "`
-do
-    srs+=("$sr")
-done
-}
-
-local () {
-for host in ${hosts[@]}
-do
-    for sr in `xe sr-list params=uuid,host,physical-size,physical-utilisation,name-label  host=$host type=$TYPE | paste -s -d " "`
+if [[ "${is_shared}" ]]
+then
+    srs+=($(xe sr-list params="${sr_params}" shared=true type="${TYPE}" \
+        | paste -s -d " "))
+else
+    for ((j=0;j<${#hosts[@]};j++))
     do
-        srs+=("$sr")
+        srs+=($(xe sr-list params="${sr_params}" type="${TYPE}" host="${hosts[j]}" \
+            | paste -s -d " "))
     done
-done
-}
+fi
 
-pr_sr () {
-    echo -n "{`echo $sr | awk -F ":" '{print $3}' | awk '{print $1 " " $2}'` on `echo $sr | awk -F ":" '{print $4}' | awk '{print $1}'` usage at `echo $sr | awk -F ":" '{print $6}' |
-     awk '{print $2}' | awk '{print ($0-int($0)<0.499)?int($0):int($0)+1}i'`%} "
-}
-
-[[ ! -z `xe sr-list shared=true type=$TYPE` ]] && shared || local
-
-for sr in ${srs[@]}
+for ((k=0;k<${#srs[@]};k++))
 do
-    percent+=("$(echo "scale=3; $(echo $sr | awk '{print $18}')/$(echo $sr | awk '{print $22}')*100" | bc)")
-done
+    used=$(printf "%s \n" "${srs[k]}" | awk '{print $18}')
+    total=$(printf "%s \n" "${srs[k]}" | awk '{print $22}')
+    percent=$(printf "%s \n" "scale=3; ${used}/${total}*100" | bc \
+        | round ) 
 
-for ((i=0;i<${#srs[@]};i++))
-do    
-    if [[ ` echo ${percent[i]}|awk '{print ($0-int($0)<0.499)?int($0):int($0)+1}'` -gt CRIT ]]
-    then 
-        crit+=(`echo ${srs[i]} ${percent[i]} crit`) && _CRIT=2
-    elif [[ ` echo ${percent[i]}|awk '{print ($0-int($0)<0.499)?int($0):int($0)+1}'` -gt WARN ]]
+    # shellcheck disable=SC2207
+    if [[ "${percent}" -ge CRIT ]]
     then
-        warn+=(`echo ${srs[i]} ${percent[i]} warn`) && _WARN=1
+        crit+=($(printf "%s \n" "${srs[k]} ${percent} crit"))
+        _CRIT=2
+    elif [[ "${percent}" -ge WARN ]]
+    then
+        warn+=($(printf "%s \n" "${srs[k]} ${percent} warn"))
+        _WARN=1
+    else
+        okay+=($(printf "%s \n" "${srs[k]} ${percent} okay"))
     fi
 done
 
 STATE=$((_CRIT+_WARN))
 
 debug () {
-for sr in ${srs[@]}
+for sr in "${srs[@]}"
 do
-echo $sr 
+echo "${sr}"
 done
+}
+
+printod () {
+    N=$(eval printf "%s" '${#'"${1}"'[@]}')
+    for ((a=0;a<N;a++))
+    do
+        bruh=$(printf "%s" "$(eval printf "%s" '${'"${1}"'[a]}')")
+
+        echo -n "{ $(echo "${bruh}" | awk -F ":" '{print $3}' | awk '{print $1 " " $2}') on \
+        $(echo "${bruh}" | awk -F ":" '{print $4}' | awk '{print $1}')\
+        usage at $(echo "${bruh}" | awk -F ":" '{print $6}' | awk '{print $2}') %} "
+    done
 }
 
 [[ $DEBUG -eq 1 ]] && debug
 
-
 case $STATE in
     1)
         echo -n "WARN: "
-    for sr in ${warn[@]}
-    do
-        pr_sr
-    done
-    echo
-    exit 1
-    ;;
+        printod warn
+        echo
+        exit 1
+        ;;
     2)
         echo -n "CRIT: "
-    for sr in ${crit[@]}
-    do
-        pr_sr
-    done
-    echo
-    exit 2
-    ;;
+        printod crit
+        echo
+        exit 2
+        ;;
     3)
         echo -n "CRIT: "
-    for sr in ${crit[@]}
-    do
-        pr_sr
-    done
+        printod crit
         echo -n "WARN: "
-    for sr in ${warn[@]}
-    do
-        pr_sr
-    done
-    echo
-    exit 2
-    ;;
+        printod warn
+        echo
+        exit 2
+        ;;
     0)
-    echo "nice"
-    exit 0
-    ;;
+        echo -n "nice"
+        printod okay
+        echo
+        exit 0
+        ;;
 esac
