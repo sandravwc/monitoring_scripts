@@ -46,6 +46,11 @@ round () {
     awk '{print ($0-int($0)<0.499)?int($0):int($0)+1}'
 }
 
+trim () {
+    awk -F "RO)|RW):" '{print $3 "on" $4}' \
+        | sed 's#physical-utilisation\ (\|\ host\ (##g; s#on:#on#g' 
+}
+
 [[ "${HELP}" -eq 1 ]] && help
 
 if [[ "${LIST}" -eq 1 ]] 
@@ -75,19 +80,19 @@ do
     used=$(printf "%s \n" "${srs[k]}" | awk '{print $18}')
     total=$(printf "%s \n" "${srs[k]}" | awk '{print $22}')
     percent=$(printf "%s \n" "scale=3; ${used}/${total}*100" | bc \
-        | round ) 
-
+        | round )
+    text=$(printf "%s \n" "${srs[k]}" | xargs | trim )
     # shellcheck disable=SC2207
     if [[ "${percent}" -ge CRIT ]]
     then
-        crit+=($(printf "%s \n" "${srs[k]} ${percent} crit"))
+        crit+=($(printf "%s \n" "${text} usage at ${percent}%"))
         _CRIT=2
     elif [[ "${percent}" -ge WARN ]]
     then
-        warn+=($(printf "%s \n" "${srs[k]} ${percent} warn"))
+        warn+=($(printf "%s \n" "${text} usage at ${percent}%"))
         _WARN=1
     else
-        okay+=($(printf "%s \n" "${srs[k]} ${percent} okay"))
+        okay+=($(printf "%s \n" "${text} usage at ${percent}%"))
     fi
 done
 
@@ -96,48 +101,45 @@ STATE=$((_CRIT+_WARN))
 debug () {
 for sr in "${srs[@]}"
 do
-echo "${sr}"
+printf "%s \n" "${sr}"
 done
 }
 
-printod () {
+print () {
     N=$(eval printf "%s" '${#'"${1}"'[@]}')
     for ((a=0;a<N;a++))
     do
         bruh=$(printf "%s" "$(eval printf "%s" '${'"${1}"'[a]}')")
-
-        echo -n "{ $(echo "${bruh}" | awk -F ":" '{print $3}' | awk '{print $1 " " $2}') on \
-        $(echo "${bruh}" | awk -F ":" '{print $4}' | awk '{print $1}')\
-        usage at $(echo "${bruh}" | awk -F ":" '{print $6}' | awk '{print $2}') %} "
+        printf " {%s} " "$(printf "%s" "${bruh}" | xargs)"
     done
 }
 
 [[ $DEBUG -eq 1 ]] && debug
 
-case $STATE in
+case "${STATE}" in
     1)
-        echo -n "WARN: "
-        printod warn
+        printf "%s" "WARN: "
+        print warn
         echo
         exit 1
         ;;
     2)
-        echo -n "CRIT: "
-        printod crit
+        printf "%s" "CRIT: "
+        print crit
         echo
         exit 2
         ;;
     3)
-        echo -n "CRIT: "
-        printod crit
-        echo -n "WARN: "
-        printod warn
+        printf "%s" "CRIT: "
+        print crit
+        printf "%s" "WARN: "
+        print warn
         echo
         exit 2
         ;;
     0)
-        echo -n "nice"
-        printod okay
+        printf "%s" "nice"
+        print okay
         echo
         exit 0
         ;;
